@@ -25,6 +25,7 @@ class DataManager:
         self.data_dir = os.path.join(self.base_dir, data_folder_name)
         self.members_file = os.path.join(self.data_dir, "task_lists.json") # Using plural version
         self.tasks_file = os.path.join(self.data_dir, "tasks.json")       # Using plural version
+        self.settings_file = os.path.join(self.data_dir, "settings.json")
         os.makedirs(self.data_dir, exist_ok=True)
 
 
@@ -60,6 +61,29 @@ class DataManager:
         except Exception as e:
             print(f"An unexpected error occurred while saving to {file_path}. Error: {e}")
 
+    def _load_settings(self) -> dict:
+        try:
+            with open(self.settings_file, 'r') as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {}
+
+    def _save_settings(self, settings: dict):
+        try:
+            with open(self.settings_file, 'w') as f:
+                json.dump(settings, f, indent=4)
+        except Exception as e:
+            print(f"Error saving settings: {e}")
+
+    def save_setting(self, key: str, value):
+        settings = self._load_settings()
+        settings[key] = value
+        self._save_settings(settings)
+
+    def load_setting(self, key: str, default=None):
+        settings = self._load_settings()
+        return settings.get(key, default)
+
     def load_data(self):
         self.task_lists.clear()
         self.tasks.clear()
@@ -70,7 +94,11 @@ class DataManager:
             if 'id' not in list_dict or 'name' not in list_dict:
                 print(f"Warning: Skipping malformed task list entry in {self.members_file}: {list_dict}")
                 continue
-            task_list = TaskList(id=list_dict['id'], name=list_dict['name'])
+            task_list = TaskList(
+                id=list_dict['id'], 
+                name=list_dict['name']
+            )
+            task_list.category = list_dict.get('category', 'default')
             self.task_lists[task_list.id] = task_list
 
         # Load Tasks
@@ -95,7 +123,7 @@ class DataManager:
 
     def save_data(self):
         # Save Task Lists
-        task_lists_list = [{"id": m.id, "name": m.name} for m in self.task_lists.values()]
+        task_lists_list = [{"id": m.id, "name": m.name, "category": getattr(m, 'category', 'default')} for m in self.task_lists.values()]
         self._save_json(self.members_file, task_lists_list)
 
         # Save Tasks
@@ -116,11 +144,12 @@ class DataManager:
         self._save_json(self.tasks_file, tasks_list) # Ensure this uses self.tasks_file
 
     # --- TaskList Operations ---
-    def add_task_list(self, name: str) -> Optional[TaskList]:
+    def add_task_list(self, name: str, category: str = 'default') -> Optional[TaskList]:
         if any(task_list.name.lower() == name.lower() for task_list in self.task_lists.values()):
             print(f"Task List '{name}' already exists.")
             return None
         new_list = TaskList(name=name)
+        new_list.category = category
         self.task_lists[new_list.id] = new_list
         self.save_data() # Ensure save is called
         return new_list
@@ -156,17 +185,29 @@ class DataManager:
 
     def delete_task_list(self, list_id: str) -> bool:
         if list_id in self.task_lists:
-            del self.task_lists[list_id]
-            # Handle tasks assigned to the deleted member:
-            # Option 1: Unassign tasks
-            tasks_to_update = []
-            for task_id, task in self.tasks.items():
-                if task.assigned_to == list_id:
-                    task.assigned_to = None # Unassign
-                    tasks_to_update.append(task)
-            for task in tasks_to_update:
-                self.update_task(task) # This will also save
-            self.save_data() # Save after member deletion and task updates
+            list_to_delete = self.task_lists[list_id]
+            ids_to_delete = {list_id}
+
+            # If it's a project block, find its child lists to delete as well
+            if getattr(list_to_delete, 'category', 'default') == 'project':
+                child_category = f"project_{list_id}"
+                child_list_ids = {
+                    tl.id for tl in self.task_lists.values() 
+                    if getattr(tl, 'category', 'default') == child_category
+                }
+                ids_to_delete.update(child_list_ids)
+
+            # Unassign tasks from all lists being deleted
+            for task in self.tasks.values():
+                if task.assigned_to in ids_to_delete:
+                    task.assigned_to = None
+            
+            # Delete the lists from the dictionary
+            for an_id in ids_to_delete:
+                if an_id in self.task_lists:
+                    del self.task_lists[an_id]
+
+            self.save_data()
             return True
         return False
 

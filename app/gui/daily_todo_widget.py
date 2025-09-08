@@ -21,6 +21,7 @@ class DailyTodoWidget(QWidget):
         super().__init__(parent)
         self.data_manager = data_manager
         self.current_task_list: Optional[TaskList] = None
+        self.current_task_lists: Optional[list[TaskList]] = None # For combined view
         self.current_date: QDate = QDate.currentDate()
 
         self.layout = QVBoxLayout(self)
@@ -51,6 +52,9 @@ class DailyTodoWidget(QWidget):
         self.add_task_button.clicked.connect(self.add_new_task)
         self.layout.addWidget(self.add_task_button)
 
+        # Initially hide widgets that depend on a task list being selected
+        self.show_placeholder_message("Select a workspace from the 'Team' menu to begin.")
+
         self.setLayout(self.layout)
 
     def on_date_changed(self, date: QDate):
@@ -60,24 +64,36 @@ class DailyTodoWidget(QWidget):
         self.load_tasks()
 
     def set_task_list_and_date(self, task_list: TaskList, date: py_date):
+        """Sets the view for a single task list."""
         self.current_task_list = task_list
+        self.current_task_lists = None # Clear the multi-list view
+
+        self.calendar.setVisible(True)
+        self.add_task_button.setVisible(True)
+        self.add_task_button.setEnabled(True)
+
         self.current_date = QDate(date)
         self.calendar.setSelectedDate(self.current_date)
         self.title_label.setText(f"Tasks for {self.current_task_list.name} on {self.current_date.toString('yyyy-MM-dd')}")
         self.load_tasks()
 
+    def show_placeholder_message(self, text: str):
+        self.current_task_list = None
+        self.title_label.setText(text)
+        self.tasks_list_widget.clear()
+        self.calendar.setVisible(False)
+        self.add_task_button.setVisible(False)
+
     def load_tasks(self):
         self.tasks_list_widget.clear()
-        if not self.current_task_list:
-            return
-
         py_target_date = self.current_date.toPyDate()
-        
-        all_tasks = self.data_manager.get_tasks_for_task_list(self.current_task_list.id)
-        
-        tasks_for_day = [
-            task for task in all_tasks if self._is_task_for_date(task, py_target_date)
-        ]
+        tasks_for_day = []
+
+        if self.current_task_list:
+            all_tasks = self.data_manager.get_tasks_for_task_list(self.current_task_list.id)
+            tasks_for_day = [task for task in all_tasks if self._is_task_for_date(task, py_target_date)]
+        else:
+            return
 
         if not tasks_for_day:
             empty_item = QTreeWidgetItem(self.tasks_list_widget)
@@ -170,7 +186,7 @@ class DailyTodoWidget(QWidget):
 
     def add_new_task(self):
         if not self.current_task_list:
-            QMessageBox.warning(self, "No Task List", "Please select a task list first.")
+            QMessageBox.warning(self, "Cannot Add Task", "Please select a list from the panel on the left.")
             return
         
         dialog = AddTaskDialog(self.current_task_list.id, self.data_manager, self)
