@@ -1,0 +1,32 @@
+[
+    {
+        "id": "6cba97cf-ef75-48b1-acb2-10c21a2cf9e0",
+        "name": "Cristina Tasie",
+        "status": "ON_LEAVE"
+    },
+    {
+        "id": "e36d5874-09ba-4980-9d56-409190285321",
+        "name": "Bahadir",
+        "status": "ACTIVE"
+    },
+    {
+        "id": "6d9256da-030e-4c24-8e9c-0a9da36a069d",
+        "name": "Ting Xiong",
+        "status": "ACTIVE"
+    },
+    {
+        "id": "8a41518c-4cb1-46d9-845a-dda6fe11a102",
+        "name": "Jianping Dong",
+        "status": "ACTIVE"
+    },
+    {
+        "id": "69521686-f402-4c91-b132-7b8168eda528",
+        "name": "Niloufar Abdi",
+        "status": "ACTIVE"
+    },
+    {
+        "id": "8d7d360a-ae0e-4251-a949-d6b5d0413c04",
+        "name": "Mohammad Sabriansani",
+        "status": "ACTIVE"
+    }
+]
