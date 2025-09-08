@@ -1,0 +1,34 @@
+[
+    {
+        "id": "29d5ab55-c9df-453c-9f3d-20742b03604f",
+        "name": "Core Platform"
+    },
+    {
+        "id": "af14c4c7-36a2-498c-af57-2033e38149bc",
+        "name": "Qulacomm Delivery - CC2.0"
+    },
+    {
+        "id": "37a536fd-72a1-4428-89b8-da8c735e3740",
+        "name": "Qualcomm Delivery - i4"
+    },
+    {
+        "id": "9efeacf9-d204-4c55-ac77-892f5ad99845",
+        "name": "Qualcomm Delivery - i3 max"
+    },
+    {
+        "id": "803f18d2-aa47-4eca-b890-01274de35bac",
+        "name": "Qualcomm Delivery - Scarthgap(i3 &i2)"
+    },
+    {
+        "id": "47aa3867-489d-464a-af9d-8115c1841013",
+        "name": "ADP - Test"
+    },
+    {
+        "id": "f97a7cd8-d3dc-422d-849c-129f97222cdd",
+        "name": "B0 - Test"
+    },
+    {
+        "id": "63d63414-8dd0-4606-8e89-6ef70a953e43",
+        "name": "Hardware Planning"
+    }
+]
