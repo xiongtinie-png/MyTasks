@@ -46,6 +46,16 @@ class TaskWorkspaceWidget(QWidget):
         self.add_list_button.clicked.connect(self.add_list)
 
         self.lists_label = QLabel("Lists:")
+        self.lists_label.setStyleSheet("""
+            QLabel {
+                padding: 4px;
+                margin: 1px;
+            }
+            QLabel:hover {
+                background: rgba(0, 0, 0, 30);
+                border-radius: 4px;
+            }
+        """)
         self.lists_label.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.lists_label.customContextMenuRequested.connect(self.show_add_list_menu_on_label)
 

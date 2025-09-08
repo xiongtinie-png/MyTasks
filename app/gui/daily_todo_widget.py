@@ -1,7 +1,8 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QTreeWidget,
-                             QPushButton, QCalendarWidget, QTreeWidgetItem, QMenu, QMessageBox)
+                             QPushButton, QCalendarWidget, QTreeWidgetItem, QMenu, QMessageBox,
+                             QInputDialog, QLineEdit)
 from PyQt6.QtCore import Qt, QDate
-from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QColor, QFont
 from ..data_manager import DataManager
 from ..data_models import TaskList, Task, TaskStatus, TaskPriority, Comment
 from .dialogs import AddTaskDialog, TaskDetailsDialog
@@ -136,11 +137,23 @@ class DailyTodoWidget(QWidget):
         item_text = self._format_task_item_text(task)
         task_item = QTreeWidgetItem()
         task_item.setText(0, item_text)
+        
+        # Set font to bold for all tasks
+        font = task_item.font(0)
+        font.setBold(True)
+        task_item.setFont(0, font)
+        
+        # Set color based on priority
+        if task.priority == TaskPriority.HIGH:
+            task_item.setForeground(0, QColor("red"))
+        elif task.priority == TaskPriority.MEDIUM:
+            task_item.setForeground(0, QColor("blue"))
+        else: # Low priority
+            task_item.setForeground(0, QColor("black"))
 
+        # Override color if status is Question, as it's a special state
         if task.status == TaskStatus.QUESTION:
             task_item.setForeground(0, QColor("magenta"))
-        elif task.priority in self._PRIORITY_COLORS:
-            task_item.setForeground(0, self._PRIORITY_COLORS[task.priority])
 
         task_item.setData(0, Qt.ItemDataRole.UserRole, task)
         return task_item
@@ -173,6 +186,7 @@ class DailyTodoWidget(QWidget):
         return comment_label
 
     def _format_task_item_text(self, task: Task) -> str:
+        attachment_indicator = " 📎" if task.attachments else ""
         date_text = ""
         if task.start_at and task.due_at:
             if task.start_at.date() == task.due_at.date():
@@ -182,7 +196,7 @@ class DailyTodoWidget(QWidget):
         elif task.due_at:
             date_text = f" (Due: {task.due_at.strftime('%b %d %H:%M')})"
 
-        return f"{task.status.value} - {task.description}{date_text}"
+        return f"{task.status.value} - {task.description}{attachment_indicator}{date_text}"
 
     def add_new_task(self):
         if not self.current_task_list:
@@ -226,30 +240,63 @@ class DailyTodoWidget(QWidget):
         item = self.tasks_list_widget.itemAt(position)
         if not item:
             return
-        
-        task = item.data(0, Qt.ItemDataRole.UserRole)
-        if not isinstance(task, Task):
-            # This is a comment or other non-task item, so don't show a context menu.
-            return
 
         menu = QMenu()
-        
-        details_action = menu.addAction("View/Edit Details & Comments")
-        details_action.triggered.connect(lambda: self.show_task_details(item))
-        menu.addSeparator()
+        data = item.data(0, Qt.ItemDataRole.UserRole)
 
-        priority_menu = menu.addMenu("Set Priority")
-        for prio in TaskPriority:
-            prio_action = priority_menu.addAction(f"{prio.value}")
-            prio_action.triggered.connect(lambda checked=False, p=prio, t=task: self.change_task_priority(t, p))
-        menu.addSeparator()
+        if isinstance(data, Task):
+            task = data
+            details_action = menu.addAction("View/Edit Details & Comments")
+            details_action.triggered.connect(lambda: self.show_task_details(item))
+            menu.addSeparator()
 
-        status_menu = menu.addMenu("Mark as")
-        for status in TaskStatus:
-            action = status_menu.addAction(f"{status.value}")
-            action.triggered.connect(lambda checked=False, s=status, t=task: self.change_task_status(t, s))
+            priority_menu = menu.addMenu("Set Priority")
+            for prio in TaskPriority:
+                prio_action = priority_menu.addAction(f"{prio.value}")
+                prio_action.triggered.connect(lambda checked=False, p=prio, t=task: self.change_task_priority(t, p))
+            menu.addSeparator()
+
+            status_menu = menu.addMenu("Mark as")
+            for status in TaskStatus:
+                action = status_menu.addAction(f"{status.value}")
+                action.triggered.connect(lambda checked=False, s=status, t=task: self.change_task_status(t, s))
+
+        elif isinstance(data, Comment):
+            comment = data
+            parent_item = item.parent()
+            if not parent_item: return
+            task = parent_item.data(0, Qt.ItemDataRole.UserRole)
+            if not isinstance(task, Task): return
+
+            edit_action = menu.addAction("Edit Comment")
+            edit_action.triggered.connect(lambda: self.edit_comment(task, comment))
+            
+            delete_action = menu.addAction("Delete Comment")
+            delete_action.triggered.connect(lambda: self.delete_comment(task, comment))
+        else:
+            return # Don't show a menu for other items
 
         menu.exec(self.tasks_list_widget.mapToGlobal(position))
+
+    def edit_comment(self, task: Task, comment: Comment):
+        """Opens a dialog to edit a comment's text."""
+        new_text, ok = QInputDialog.getText(self, "Edit Comment", "Comment:",
+                                            QLineEdit.EchoMode.Normal, comment.text)
+        if ok and new_text.strip():
+            comment.text = new_text.strip()
+            self.data_manager.update_task(task)
+            self.load_tasks()
+
+    def delete_comment(self, task: Task, comment: Comment):
+        """Asks for confirmation and deletes a comment."""
+        reply = QMessageBox.question(self, "Confirm Deletion",
+                                     "Are you sure you want to delete this comment?",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                     QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            task.comments.remove(comment)
+            self.data_manager.update_task(task)
+            self.load_tasks()
 
     def change_task_priority(self, task: Task, new_priority: TaskPriority):
         task.priority = new_priority

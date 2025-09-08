@@ -13,5 +13,10 @@
         "id": "4fa12bb5-e276-4bea-96cb-f07c5e73000a",
         "name": "Example",
         "category": "project"
+    },
+    {
+        "id": "2152123f-93bc-4421-a983-087a2bf5e961",
+        "name": "Test",
+        "category": "project_4fa12bb5-e276-4bea-96cb-f07c5e73000a"
     }
 ]

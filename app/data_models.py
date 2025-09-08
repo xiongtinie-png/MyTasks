@@ -6,6 +6,7 @@ from typing import List, Optional
 
 class TaskStatus(Enum):
     PENDING = "Pending"
+    ONGOING = "Ongoing"
     DONE = "Done"
     QUESTION = "Question"
 
@@ -33,6 +34,7 @@ class Task:
     description: str = ""
     status: TaskStatus = TaskStatus.PENDING
     comments: List[Comment] = field(default_factory=list)
+    attachments: List[str] = field(default_factory=list)
     priority: TaskPriority = TaskPriority.MEDIUM
     created_at: datetime = field(default_factory=datetime.now)
     start_at: Optional[datetime] = None

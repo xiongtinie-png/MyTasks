@@ -23,10 +23,12 @@ class DataManager:
             self.base_dir = os.path.abspath(os.path.join(script_dir, os.pardir))
 
         self.data_dir = os.path.join(self.base_dir, data_folder_name)
+        self.attachments_dir = os.path.join(self.data_dir, "attachments")
         self.members_file = os.path.join(self.data_dir, "task_lists.json") # Using plural version
         self.tasks_file = os.path.join(self.data_dir, "tasks.json")       # Using plural version
         self.settings_file = os.path.join(self.data_dir, "settings.json")
         os.makedirs(self.data_dir, exist_ok=True)
+        os.makedirs(self.attachments_dir, exist_ok=True)
 
 
         self.task_lists: Dict[str, TaskList] = {}
@@ -105,11 +107,13 @@ class DataManager:
         tasks_data = self._load_json(self.tasks_file)
         for task_dict in tasks_data:
             comments = [Comment.from_dict(c) for c in task_dict.get('comments', [])]
+            attachments = task_dict.get('attachments', [])
             task = Task(
                 id=task_dict['id'],
                 description=task_dict['description'],
                 status=TaskStatus[task_dict.get('status', TaskStatus.PENDING.name).upper()],
                 comments=comments,
+                attachments=attachments,
                 priority=TaskPriority[task_dict.get('priority', TaskPriority.MEDIUM.name).upper()],
                 created_at=datetime.fromisoformat(task_dict.get('created_at', datetime.now().isoformat())),
                 assigned_to=task_dict.get('assigned_to')
@@ -135,6 +139,7 @@ class DataManager:
                 "status": task.status.name, # Store enum name
                 "priority": task.priority.name, # Store enum name
                 "comments": [c.to_dict() for c in task.comments],
+                "attachments": task.attachments,
                 "created_at": task.created_at.isoformat(),
                 "start_at": task.start_at.isoformat() if task.start_at else None,
                 "due_at": task.due_at.isoformat() if task.due_at else None, # Save due_at
