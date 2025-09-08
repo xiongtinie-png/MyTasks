@@ -1,13 +1,13 @@
-# Team Task Manager
+# TaskMaster
 
-A desktop application built with Python and PyQt6 for managing daily team tasks.
+A desktop application built with Python and PyQt6 for managing daily tasks.
 
 ## Features
-- Add and manage team members.
-- Assign daily to-do tasks to team members.
+- Add and manage Tasklists.
+- Assign daily to-do tasks to different list.
 - Track task status (Pending, Done, Question).
 - Add comments to tasks.
-- View an overview of all team tasks and historical data.
+- View an overview of all todo tasks and historical data.
 
 ## Setup & Running
 1. Clone the repository.
