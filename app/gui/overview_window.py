@@ -1,9 +1,9 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTreeWidget, QTreeWidgetItem, QDialogButtonBox
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QMenu, QMessageBox
+from PyQt6.QtCore import Qt, QPoint
 from typing import Union, Optional
 from ..data_manager import DataManager
 from ..data_models import Task, TaskList, TaskStatus, TaskPriority
-from .dialogs import TaskDetailsDialog
+from .dialogs import TaskEditDialog
 from datetime import datetime
 
 class OverviewWindow(QDialog):
@@ -17,6 +17,8 @@ class OverviewWindow(QDialog):
         self.tree = QTreeWidget()
         self.tree.setHeaderLabels(["List / Task", "Status", "Priority", "Due Date"])
         self.tree.itemDoubleClicked.connect(self.on_item_double_clicked)
+        self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self.show_context_menu)
         self.layout.addWidget(self.tree)
 
         # --- Buttons ---
@@ -77,9 +79,39 @@ class OverviewWindow(QDialog):
         """Handle double-clicking on a task to edit it."""
         task = item.data(0, Qt.ItemDataRole.UserRole)
         if isinstance(task, Task):
-            dialog = TaskDetailsDialog(task, self.data_manager, self)
+            dialog = TaskEditDialog(task=task, data_manager=self.data_manager, parent=self)
             if dialog.exec():
                 self.load_overview_data() # Refresh data in case of changes
+
+    def show_context_menu(self, position: QPoint):
+        """Shows a context menu for tasks in the overview."""
+        item = self.tree.itemAt(position)
+        if not item:
+            return
+
+        task = item.data(0, Qt.ItemDataRole.UserRole)
+        if not isinstance(task, Task):
+            return
+
+        menu = QMenu()
+        edit_action = menu.addAction("View/Edit Details")
+        edit_action.triggered.connect(lambda: self.on_item_double_clicked(item, 0))
+        menu.addSeparator()
+        delete_action = menu.addAction("Delete Task")
+        delete_action.triggered.connect(lambda: self.delete_task(task))
+        
+        menu.exec(self.tree.mapToGlobal(position))
+
+    def delete_task(self, task: Task):
+        """Asks for confirmation and deletes a task from the overview."""
+        reply = QMessageBox.question(self, "Confirm Deletion",
+                                     f"Are you sure you want to delete the task '{task.description}'?\n\n"
+                                     "This action cannot be undone.",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                     QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            if self.data_manager.delete_task(task.id):
+                self.load_overview_data() # Refresh the overview
 
     def showEvent(self, event):
         """Reload data when the window is shown."""

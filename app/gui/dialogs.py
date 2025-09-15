@@ -43,81 +43,21 @@ class AddTaskListDialog(QDialog):
             return
         super().accept()
 
-class AddTaskDialog(QDialog):
-    """Dialog to add a new task."""
-    def __init__(self, task_list_id: str, data_manager: DataManager, parent=None):
-        super().__init__(parent)
-        self.task_list_id = task_list_id
-        self.data_manager = data_manager
-        
-        self.setWindowTitle("Add New Task")
-        self.setMinimumWidth(400)
-        
-        self.layout = QFormLayout(self)
-        
-        self.description_edit = QLineEdit()
-        self.description_edit.setStyleSheet("""
-            QLineEdit {
-                color: black;
-                font-weight: bold;
-                background-color: white;
-            }
-        """)
-        self.layout.addRow("Description:", self.description_edit)
-        
-        self.priority_combo = QComboBox()
-        for priority in TaskPriority:
-            self.priority_combo.addItem(priority.value, priority)
-        self.layout.addRow("Priority:", self.priority_combo)
-        
-        self.start_at_edit = QDateTimeEdit(QDateTime.currentDateTime())
-        self.start_at_edit.setCalendarPopup(True)
-        self.layout.addRow("Start At:", self.start_at_edit)
-
-        self.due_at_edit = QDateTimeEdit(QDateTime.currentDateTime().addDays(1))
-        self.due_at_edit.setCalendarPopup(True)
-        self.layout.addRow("Due At:", self.due_at_edit)
-        
-        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        self.button_box.accepted.connect(self.accept)
-        self.button_box.rejected.connect(self.reject)
-        self.layout.addWidget(self.button_box)
-
-    def accept(self):
-        """Validate data and add the task."""
-        description = self.description_edit.text().strip()
-        if not description:
-            QMessageBox.warning(self, "Input Error", "Task description cannot be empty.")
-            return
-
-        priority = self.priority_combo.currentData()
-        start_at = self.start_at_edit.dateTime().toPyDateTime()
-        due_at = self.due_at_edit.dateTime().toPyDateTime()
-
-        if start_at >= due_at:
-            QMessageBox.warning(self, "Input Error", "Start date must be before due date.")
-            return
-
-        new_task = self.data_manager.add_task(
-            description=description,
-            assigned_to_id=self.task_list_id,
-            priority=priority,
-            start_at=start_at,
-            due_at=due_at
-        )
-
-        if new_task:
-            super().accept()
-        else:
-            QMessageBox.critical(self, "Error", "Failed to create the task. The assigned task list may no longer exist.")
-
-class TaskDetailsDialog(QDialog):
-    """Dialog to view and edit a task and its comments."""
-    def __init__(self, task: Task, data_manager: DataManager, parent=None):
+class TaskEditDialog(QDialog):
+    """A comprehensive dialog to add a new task or edit an existing one."""
+    def __init__(self, data_manager: DataManager, task: Optional[Task] = None, task_list_id: Optional[str] = None, parent=None):
         super().__init__(parent)
         self.task = task
         self.data_manager = data_manager
-        self.setWindowTitle("Task Details")
+        self.task_list_id = task_list_id
+        self.is_new_task = (task is None)
+
+        if self.is_new_task:
+            self.setWindowTitle("Add New Task")
+            self.task = Task() # Create a temporary task object
+        else:
+            self.setWindowTitle("Task Details")
+
         self.setMinimumWidth(500)
 
         self.layout = QVBoxLayout(self)
@@ -138,15 +78,19 @@ class TaskDetailsDialog(QDialog):
         self.priority_combo = QComboBox()
         for priority in TaskPriority:
             self.priority_combo.addItem(priority.value, priority)
-        current_prio_index = list(TaskPriority).index(self.task.priority)
-        self.priority_combo.setCurrentIndex(current_prio_index)
+        if not self.is_new_task:
+            current_prio_index = list(TaskPriority).index(self.task.priority)
+            self.priority_combo.setCurrentIndex(current_prio_index)
+        else:
+            self.priority_combo.setCurrentIndex(list(TaskPriority).index(TaskPriority.MEDIUM))
         form_layout.addRow("Priority:", self.priority_combo)
 
         # Status
         self.status_combo = QComboBox()
         for status in TaskStatus:
             self.status_combo.addItem(status.value, status)
-        self.status_combo.setCurrentIndex(list(TaskStatus).index(self.task.status))
+        if not self.is_new_task:
+            self.status_combo.setCurrentIndex(list(TaskStatus).index(self.task.status))
         form_layout.addRow("Status:", self.status_combo)
 
         # Start At
@@ -201,9 +145,15 @@ class TaskDetailsDialog(QDialog):
 
         # --- Main Dialog Buttons ---
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        
+        if not self.is_new_task:
+            delete_button = self.button_box.addButton("Delete", QDialogButtonBox.ButtonRole.DestructiveRole)
+            delete_button.clicked.connect(self.delete_task_and_close)
+
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
         self.layout.addWidget(self.button_box)
+
 
     def load_comments(self):
         """Loads comments into a QListWidget with custom widgets."""
@@ -426,26 +376,59 @@ class TaskDetailsDialog(QDialog):
             self.data_manager.update_task(self.task)
             self.load_attachments()
 
+    def delete_task_and_close(self):
+        """Handles the deletion of the current task from the dialog."""
+        reply = QMessageBox.question(self, "Confirm Deletion",
+                                     f"Are you sure you want to delete the task '{self.task.description}'?\n\n"
+                                     "This action cannot be undone.",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                     QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            if self.data_manager.delete_task(self.task.id):
+                # Accept the dialog to signal a change was made.
+                super().accept()
+            else:
+                QMessageBox.warning(self, "Error", "Failed to delete the task.")
+
     def accept(self):
-        """Saves changes to the task."""
+        """Saves changes for an existing task or creates a new task."""
         description = self.description_edit.text().strip()
         if not description:
             QMessageBox.warning(self, "Input Error", "Task description cannot be empty.")
             return
 
-        start_at = self.start_at_edit.dateTime().toPyDateTime()
-        due_at = self.due_at_edit.dateTime().toPyDateTime()
-
-        if start_at >= due_at:
+        if self.start_at_edit.dateTime() >= self.due_at_edit.dateTime():
             QMessageBox.warning(self, "Input Error", "Start date must be before due date.")
             return
 
-        # Update all task properties from the dialog fields
-        self.task.description = self.description_edit.text().strip()
+        # Update the task object (either temporary or existing) from the dialog fields
+        self.task.description = description
         self.task.status = self.status_combo.currentData()
         self.task.priority = self.priority_combo.currentData()
         self.task.start_at = self.start_at_edit.dateTime().toPyDateTime()
         self.task.due_at = self.due_at_edit.dateTime().toPyDateTime()
         
-        self.data_manager.update_task(self.task)
+        if self.is_new_task:
+            # This is a new task, we need to add it first to get an ID
+            self.task.assigned_to = self.task_list_id
+            
+            # The DataManager's add_task method creates the object, so we pass the values.
+            # We'll update it with comments/attachments right after.
+            created_task = self.data_manager.add_task(
+                description=self.task.description,
+                assigned_to_id=self.task_list_id,
+                priority=self.task.priority,
+                status=self.task.status,
+                start_at=self.task.start_at,
+                due_at=self.task.due_at,
+                comments=self.task.comments, # Pass staged comments
+                attachments=self.task.attachments # Pass staged attachments
+            )
+            if not created_task:
+                QMessageBox.critical(self, "Error", "Failed to create the task.")
+                return
+        else:
+            # This is an existing task, just update it
+            self.data_manager.update_task(self.task)
+
         super().accept()

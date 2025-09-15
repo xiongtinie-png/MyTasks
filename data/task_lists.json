@@ -2,21 +2,25 @@
     {
         "id": "2545881a-ad48-4ec5-8bdd-9ac15a5f2f25",
         "name": "Projects info",
-        "category": "project"
+        "category": "project",
+        "is_pinned": false
     },
     {
         "id": "dc007270-9516-47a7-820d-5f218634bd82",
         "name": "Info",
-        "category": "project"
+        "category": "project",
+        "is_pinned": false
     },
     {
         "id": "4fa12bb5-e276-4bea-96cb-f07c5e73000a",
         "name": "Example",
-        "category": "project"
+        "category": "project",
+        "is_pinned": false
     },
     {
         "id": "2152123f-93bc-4421-a983-087a2bf5e961",
         "name": "Test",
-        "category": "project_4fa12bb5-e276-4bea-96cb-f07c5e73000a"
+        "category": "project_4fa12bb5-e276-4bea-96cb-f07c5e73000a",
+        "is_pinned": true
     }
 ]

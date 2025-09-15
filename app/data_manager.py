@@ -5,6 +5,7 @@ import sys # Import sys to check if running as a bundled app
 from datetime import datetime, date
 from typing import List, Dict, Optional
 from .data_models import TaskList, Task, TaskStatus, Comment, TaskPriority
+import shutil
 # from .utils import DATE_FORMAT # Currently not used in this file
 
 class DataManager:
@@ -100,7 +101,9 @@ class DataManager:
                 id=list_dict['id'], 
                 name=list_dict['name']
             )
-            task_list.category = list_dict.get('category', 'default')
+            # Backwards compatibility for old data
+            task_list.category = list_dict.get('category', 'default') # Already exists, good.
+            task_list.is_pinned = list_dict.get('is_pinned', False)
             self.task_lists[task_list.id] = task_list
 
         # Load Tasks
@@ -120,6 +123,7 @@ class DataManager:
             ) # due_at will be None if not present in old data
             task.start_at = datetime.fromisoformat(task_dict['start_at']) if task_dict.get('start_at') else None
             task.due_at = datetime.fromisoformat(task_dict['due_at']) if task_dict.get('due_at') else None
+            task.is_pinned = task_dict.get('is_pinned', False)
             self.tasks[task.id] = task
         print("Data loaded.")
         if not task_lists_data and not tasks_data:
@@ -127,7 +131,12 @@ class DataManager:
 
     def save_data(self):
         # Save Task Lists
-        task_lists_list = [{"id": m.id, "name": m.name, "category": getattr(m, 'category', 'default')} for m in self.task_lists.values()]
+        task_lists_list = [{
+            "id": m.id, 
+            "name": m.name, 
+            "category": getattr(m, 'category', 'default'),
+            "is_pinned": getattr(m, 'is_pinned', False)
+        } for m in self.task_lists.values()]
         self._save_json(self.members_file, task_lists_list)
 
         # Save Tasks
@@ -145,6 +154,7 @@ class DataManager:
                 "due_at": task.due_at.isoformat() if task.due_at else None, # Save due_at
                 "assigned_to": task.assigned_to
             }
+            task_dict['is_pinned'] = getattr(task, 'is_pinned', False)
             tasks_list.append(task_dict)
         self._save_json(self.tasks_file, tasks_list) # Ensure this uses self.tasks_file
 
@@ -216,10 +226,32 @@ class DataManager:
             return True
         return False
 
+    def delete_task(self, task_id: str) -> bool:
+        """Deletes a task and its associated attachments."""
+        if task_id in self.tasks:
+            task_to_delete = self.tasks[task_id]
+
+            # --- Clean up attachments directory ---
+            if task_to_delete.attachments:
+                task_attachment_dir = os.path.join(self.attachments_dir, task_id)
+                if os.path.isdir(task_attachment_dir):
+                    try:
+                        shutil.rmtree(task_attachment_dir)
+                        print(f"Deleted attachment directory: {task_attachment_dir}")
+                    except Exception as e:
+                        print(f"Error deleting attachment directory for task {task_id}: {e}")
+                        # Proceed with deleting the task record even if file deletion fails
+
+            del self.tasks[task_id]
+            self.save_data()
+            return True
+        return False
+
     # --- Task Operations ---
     def add_task(self, description: str, assigned_to_id: str,
                  priority: TaskPriority = TaskPriority.MEDIUM, status: TaskStatus = TaskStatus.PENDING,
-                 start_at: Optional[datetime] = None, due_at: Optional[datetime] = None) -> Optional[Task]:
+                 start_at: Optional[datetime] = None, due_at: Optional[datetime] = None,
+                 comments: Optional[List[Comment]] = None, attachments: Optional[List[str]] = None) -> Optional[Task]:
         if assigned_to_id not in self.task_lists:
             print(f"Error: Task List with ID '{assigned_to_id}' not found.")
             return None
@@ -229,7 +261,9 @@ class DataManager:
             priority=priority,
             status=status,
             start_at=start_at,
-            due_at=due_at
+            due_at=due_at,
+            comments=comments or [],
+            attachments=attachments or []
         )
         self.tasks[task.id] = task # Add to the dictionary
         self.save_data() # Save immediately after adding a task

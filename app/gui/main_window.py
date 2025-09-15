@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QWidget, QL
 from PyQt6.QtGui import QAction, QKeySequence, QColor, QPixmap, QPalette, QBrush, QPainter, QFont
 from PyQt6.QtCore import Qt, QTimer, QDateTime, QRect, QDate
 from ..data_manager import DataManager # Import DataManager
-from .dialogs import AddTaskListDialog
+from .dialogs import AddTaskListDialog # QColorDialog is a standard widget, not from here
 from .daily_todo_widget import DailyTodoWidget
 from .overview_window import OverviewWindow
 from ..data_models import TaskStatus, TaskList
@@ -64,7 +64,7 @@ class TaskWorkspaceWidget(QWidget):
         panel_layout.addWidget(self.add_list_button)
         
         # --- Central Task View ---
-        self.daily_todo_widget = DailyTodoWidget(self.data_manager)
+        self.daily_todo_widget = DailyTodoWidget(self.data_manager, self)
 
         splitter.addWidget(self.list_panel)
         splitter.addWidget(self.daily_todo_widget)
@@ -78,10 +78,17 @@ class TaskWorkspaceWidget(QWidget):
         self.current_context_id = context_id
         self.list_panel.setVisible(True)
 
+        # Update the title label based on the selected workspace
         if context_id == "__DEFAULT_LISTS__":
             self.current_context_category = 'default'
+            self.lists_label.setText("📋 TaskLists:")
         else: # It's a project block ID
             self.current_context_category = f"project_{context_id}"
+            workspace_list = self.data_manager.get_task_list_by_id(context_id)
+            if workspace_list:
+                self.lists_label.setText(f"📦 {workspace_list.name}:")
+            else:
+                self.lists_label.setText("Workspace:") # Fallback if not found
         
         self.refresh_list_panel()
 
@@ -93,19 +100,34 @@ class TaskWorkspaceWidget(QWidget):
             tl for tl in all_lists if getattr(tl, 'category', 'default') == self.current_context_category
         ]
 
-        sorted_lists = sorted(lists_for_context, key=lambda tl: tl.name)
+        # Sort by pinned status first (True comes before False), then by name
+        sorted_lists = sorted(lists_for_context, key=lambda tl: (not getattr(tl, 'is_pinned', False), tl.name))
 
         for task_list in sorted_lists:
-            item = QListWidgetItem(task_list.name)
+            # Add pin indicator to the text if pinned
+            item_text = f"📌 {task_list.name}" if getattr(task_list, 'is_pinned', False) else task_list.name
+            item = QListWidgetItem(item_text)
             item.setData(Qt.ItemDataRole.UserRole, task_list)
             self.list_widget.addItem(item)
         
         if sorted_lists:
-            # If there are lists, automatically select the first one.
+            # Temporarily disconnect the signal to prevent on_list_selected from firing.
+            # This is more reliable than blockSignals() for this use case.
+            try:
+                self.list_widget.itemClicked.disconnect(self.on_list_selected)
+            except TypeError: # Signal was not connected
+                pass
+
             first_item = self.list_widget.item(0)
             if first_item:
                 self.list_widget.setCurrentItem(first_item)
-                self.on_list_selected(first_item)
+
+                # Manually update the daily_todo_widget with the correct, fresh data
+                first_task_list = first_item.data(Qt.ItemDataRole.UserRole)
+                self.daily_todo_widget.set_task_list_and_date(first_task_list, self.daily_todo_widget.current_date.toPyDate())
+
+            # Reconnect the signal for future user clicks.
+            self.list_widget.itemClicked.connect(self.on_list_selected)
         else:
             # If there are no lists, show a more helpful placeholder.
             self.daily_todo_widget.show_placeholder_message("This workspace is empty. Add a list to get started.")
@@ -142,6 +164,15 @@ class TaskWorkspaceWidget(QWidget):
             rename_action.triggered.connect(lambda: self.rename_list(task_list))
             delete_action = menu.addAction("Delete")
             delete_action.triggered.connect(lambda: self.delete_list(task_list))
+
+            menu.addSeparator()
+
+            # --- Pinning Action ---
+            is_pinned = getattr(task_list, 'is_pinned', False)
+            pin_action_text = "Unpin from Top" if is_pinned else "Pin to Top"
+            pin_action = menu.addAction(pin_action_text)
+            pin_action.triggered.connect(lambda: self.parent().toggle_list_pin_status(task_list.id))
+
         else:
             # Show 'Add List' when clicking on empty space
             add_action = menu.addAction("Add List...")
@@ -261,6 +292,7 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.status_bar)
         self.time_label = QLabel()
         self.status_bar.addPermanentWidget(self.time_label)
+        self.alarm_dialog: Optional[QMessageBox] = None # To hold a reference to the alarm dialog
 
     def _create_central_widget(self):
         # The central widget will now be the DailyTodoWidget, initially hidden or showing a placeholder
@@ -350,6 +382,15 @@ class MainWindow(QMainWindow):
 
             else:
                 QMessageBox.warning(self, "Error", f"Could not delete Task List '{task_list.name}'.")
+
+    def toggle_list_pin_status(self, list_id: str):
+        """Toggles the 'is_pinned' status of a task list."""
+        task_list = self.data_manager.get_task_list_by_id(list_id)
+        if task_list:
+            current_status = getattr(task_list, 'is_pinned', False)
+            task_list.is_pinned = not current_status
+            self.data_manager.update_task_list(task_list)
+            self.workspace.refresh_list_panel()
 
     def update_time_display(self):
         now = QDateTime.currentDateTime()
@@ -446,36 +487,34 @@ class MainWindow(QMainWindow):
                 notification_title = "Team Task Due Soon!"
                 notification_message = f"Task '{task.description}' assigned to {member_name} is due within 12 hours ({task.due_at.strftime('%Y-%m-%d %H:%M')})."
 
-                if notification: # Use plyer for native notifications if available
-                    try:
-                        notification.notify(
-                            title=notification_title,
-                            message=notification_message,
-                            app_name='Team Task Manager',
-                            timeout=10  # Notification will disappear after 10 seconds
-                        )
-                        print("    --> Sent native notification via plyer.")
-                    except Exception as e:
-                        print(f"    --> Plyer notification failed: {e}. Falling back to QMessageBox.")
-                        self._show_qmessagebox_alarm(notification_title, notification_message)
-                else: # Fallback to QMessageBox
-                    print("    --> Plyer not available. Using QMessageBox for alarm.")
-                    self._show_qmessagebox_alarm(notification_title, notification_message)
+                # We will now always use the more assertive QMessageBox for alarms.
+                self._show_qmessagebox_alarm(notification_title, notification_message)
 
                 self._triggered_alarms.add(task.id) # Mark alarm as triggered for this session
             else:
                 print(f"    No alarm for task: {task.description}. (Condition: {seconds_until_due > 0} and {seconds_until_due <= 12 * 3600})")
 
     def _show_qmessagebox_alarm(self, title: str, message: str):
-        """Displays a modal QMessageBox alarm as a fallback."""
-        alarm_dialog = QMessageBox(self)
-        alarm_dialog.setIcon(QMessageBox.Icon.Warning)
-        alarm_dialog.setWindowTitle(title)
-        alarm_dialog.setText(message)
-        alarm_dialog.setStandardButtons(QMessageBox.StandardButton.Ok)
+        """Displays a modeless, always-on-top QMessageBox alarm, ensuring only one is shown at a time."""
+        # If an alarm dialog is already visible, don't create a new one.
+        if self.alarm_dialog and self.alarm_dialog.isVisible():
+            print("    --> Alarm dialog is already visible. Skipping new alarm.")
+            return
+
+        self.alarm_dialog = QMessageBox(None) # No parent, so it's independent of the main window
+        self.alarm_dialog.setIcon(QMessageBox.Icon.Warning)
+        self.alarm_dialog.setWindowTitle(title)
+        self.alarm_dialog.setText(message)
+        self.alarm_dialog.setStandardButtons(QMessageBox.StandardButton.Ok)
         
-        QApplication.alert(alarm_dialog, 0) # Request OS to alert user (e.g., flash taskbar)
-        alarm_dialog.exec()
+        # This flag makes the dialog stay on top of all other windows
+        self.alarm_dialog.setWindowFlags(self.alarm_dialog.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+
+        # Use show() instead of exec() to make it non-blocking (modeless)
+        self.alarm_dialog.show()
+        
+        # Request OS to alert user (e.g., flash taskbar icon)
+        QApplication.alert(self.alarm_dialog, 0)
 
     def closeEvent(self, event):
         # Override closeEvent to save data before exiting

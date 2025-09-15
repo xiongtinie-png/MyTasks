@@ -1,5 +1,5 @@
 ('C:\\Users\\xiongti\\Documents\\Jira '
- 'Update\\MyTasks\\build\\MyTasks\\PYZ-00.pyz',
+ 'Update\\MyTasks\\build\\Mytasks\\PYZ-00.pyz',
  [('PyQt6',
    'C:\\Users\\xiongti\\AppData\\Local\\Programs\\Python\\Python39\\lib\\site-packages\\PyQt6\\__init__.py',
    'PYMODULE'),

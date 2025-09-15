@@ -4,8 +4,8 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QTreeWidget,
 from PyQt6.QtCore import Qt, QDate
 from PyQt6.QtGui import QColor, QFont
 from ..data_manager import DataManager
-from ..data_models import TaskList, Task, TaskStatus, TaskPriority, Comment
-from .dialogs import AddTaskDialog, TaskDetailsDialog
+from ..data_models import TaskList, Task, TaskStatus, TaskPriority, Comment # AddTaskDialog is removed
+from .dialogs import TaskEditDialog
 from datetime import date as py_date, datetime
 from typing import Optional
 import re
@@ -102,7 +102,8 @@ class DailyTodoWidget(QWidget):
             empty_item.setDisabled(True)
             return
 
-        tasks_for_day.sort(key=lambda t: (t.priority.value, t.due_at or datetime.max))
+        # Sort by pinned status first, then priority, then due date
+        tasks_for_day.sort(key=lambda t: (not getattr(t, 'is_pinned', False), t.priority.value, t.due_at or datetime.max))
 
         for task in tasks_for_day:
             # Create the top-level item for the task
@@ -187,6 +188,7 @@ class DailyTodoWidget(QWidget):
 
     def _format_task_item_text(self, task: Task) -> str:
         attachment_indicator = " 📎" if task.attachments else ""
+        pin_indicator = "📌 " if getattr(task, 'is_pinned', False) else ""
         date_text = ""
         if task.start_at and task.due_at:
             if task.start_at.date() == task.due_at.date():
@@ -196,14 +198,14 @@ class DailyTodoWidget(QWidget):
         elif task.due_at:
             date_text = f" (Due: {task.due_at.strftime('%b %d %H:%M')})"
 
-        return f"{task.status.value} - {task.description}{attachment_indicator}{date_text}"
+        return f"{pin_indicator}{task.status.value} - {task.description}{attachment_indicator}{date_text}"
 
     def add_new_task(self):
         if not self.current_task_list:
             QMessageBox.warning(self, "Cannot Add Task", "Please select a list from the panel on the left.")
             return
         
-        dialog = AddTaskDialog(self.current_task_list.id, self.data_manager, self)
+        dialog = TaskEditDialog(data_manager=self.data_manager, task_list_id=self.current_task_list.id, parent=self)
         if dialog.exec():
             self.load_tasks()
 
@@ -232,7 +234,7 @@ class DailyTodoWidget(QWidget):
         if not isinstance(task, Task):
             return
         
-        dialog = TaskDetailsDialog(task, self.data_manager, self)
+        dialog = TaskEditDialog(task=task, data_manager=self.data_manager, parent=self)
         if dialog.exec():
             self.load_tasks()
 
@@ -250,6 +252,13 @@ class DailyTodoWidget(QWidget):
             details_action.triggered.connect(lambda: self.show_task_details(item))
             menu.addSeparator()
 
+            # --- Pinning Action ---
+            is_pinned = getattr(task, 'is_pinned', False)
+            pin_action_text = "Unpin Task" if is_pinned else "Pin Task"
+            pin_action = menu.addAction(pin_action_text)
+            pin_action.triggered.connect(lambda: self.toggle_task_pin_status(task))
+            menu.addSeparator()
+
             priority_menu = menu.addMenu("Set Priority")
             for prio in TaskPriority:
                 prio_action = priority_menu.addAction(f"{prio.value}")
@@ -260,6 +269,10 @@ class DailyTodoWidget(QWidget):
             for status in TaskStatus:
                 action = status_menu.addAction(f"{status.value}")
                 action.triggered.connect(lambda checked=False, s=status, t=task: self.change_task_status(t, s))
+            
+            menu.addSeparator()
+            delete_action = menu.addAction("Delete Task")
+            delete_action.triggered.connect(lambda: self.delete_task(task))
 
         elif isinstance(data, Comment):
             comment = data
@@ -298,6 +311,19 @@ class DailyTodoWidget(QWidget):
             self.data_manager.update_task(task)
             self.load_tasks()
 
+    def delete_task(self, task: Task):
+        """Asks for confirmation and deletes a task."""
+        reply = QMessageBox.question(self, "Confirm Deletion",
+                                     f"Are you sure you want to delete the task '{task.description}'?\n\n"
+                                     "This action cannot be undone.",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                     QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            if self.data_manager.delete_task(task.id):
+                self.load_tasks()
+            else:
+                QMessageBox.warning(self, "Error", "Failed to delete the task.")
+
     def change_task_priority(self, task: Task, new_priority: TaskPriority):
         task.priority = new_priority
         self.data_manager.update_task(task)
@@ -305,5 +331,12 @@ class DailyTodoWidget(QWidget):
 
     def change_task_status(self, task: Task, new_status: TaskStatus):
         task.status = new_status
+        self.data_manager.update_task(task)
+        self.load_tasks()
+
+    def toggle_task_pin_status(self, task: Task):
+        """Toggles the 'is_pinned' status of a task."""
+        current_status = getattr(task, 'is_pinned', False)
+        task.is_pinned = not current_status
         self.data_manager.update_task(task)
         self.load_tasks()

@@ -20,7 +20,8 @@
         "created_at": "2025-05-22T18:52:20.058940",
         "start_at": null,
         "due_at": null,
-        "assigned_to": "6cba97cf-ef75-48b1-acb2-10c21a2cf9e0"
+        "assigned_to": "6cba97cf-ef75-48b1-acb2-10c21a2cf9e0",
+        "is_pinned": false
     },
     {
         "id": "dea266b2-3792-4700-94fc-6b0e1acb2eda",
@@ -32,7 +33,8 @@
         "created_at": "2025-05-22T19:02:39.556149",
         "start_at": null,
         "due_at": null,
-        "assigned_to": "6cba97cf-ef75-48b1-acb2-10c21a2cf9e0"
+        "assigned_to": "6cba97cf-ef75-48b1-acb2-10c21a2cf9e0",
+        "is_pinned": false
     },
     {
         "id": "575d6a6b-dc02-4162-b672-283afc8ad908",
@@ -44,7 +46,8 @@
         "created_at": "2025-05-22T19:28:28.433919",
         "start_at": null,
         "due_at": null,
-        "assigned_to": "6cba97cf-ef75-48b1-acb2-10c21a2cf9e0"
+        "assigned_to": "6cba97cf-ef75-48b1-acb2-10c21a2cf9e0",
+        "is_pinned": false
     },
     {
         "id": "256129a1-09aa-4418-b517-02e2af39fc85",
@@ -56,7 +59,8 @@
         "created_at": "2025-06-04T15:11:00.631975",
         "start_at": null,
         "due_at": "2025-06-04T15:12:30.868000",
-        "assigned_to": "8a41518c-4cb1-46d9-845a-dda6fe11a102"
+        "assigned_to": "8a41518c-4cb1-46d9-845a-dda6fe11a102",
+        "is_pinned": false
     },
     {
         "id": "485bc5b5-7d0a-45f9-bfe1-95e5033f28ad",
@@ -68,7 +72,8 @@
         "created_at": "2025-06-04T15:14:02.455687",
         "start_at": null,
         "due_at": "2025-06-05T22:00:20.641000",
-        "assigned_to": "8a41518c-4cb1-46d9-845a-dda6fe11a102"
+        "assigned_to": "8a41518c-4cb1-46d9-845a-dda6fe11a102",
+        "is_pinned": false
     },
     {
         "id": "3cdb09ad-c517-4e13-a8a0-857983caa514",
@@ -80,7 +85,8 @@
         "created_at": "2025-09-02T13:32:11.717369",
         "start_at": "2024-08-14T14:32:02.165000",
         "due_at": "2025-09-03T14:32:02.166000",
-        "assigned_to": "6cba97cf-ef75-48b1-acb2-10c21a2cf9e0"
+        "assigned_to": "6cba97cf-ef75-48b1-acb2-10c21a2cf9e0",
+        "is_pinned": false
     },
     {
         "id": "f31b28db-1924-4036-8a3a-51e430dfe204",
@@ -92,7 +98,8 @@
         "created_at": "2025-09-08T10:38:02.078432",
         "start_at": "2025-09-08T10:37:47.779000",
         "due_at": "2025-09-23T10:37:47.781000",
-        "assigned_to": null
+        "assigned_to": null,
+        "is_pinned": false
     },
     {
         "id": "31b403e9-4258-491d-b3f7-cb2bad2137ef",
@@ -115,7 +122,8 @@
         "created_at": "2025-09-08T10:39:15.714636",
         "start_at": "2025-09-08T10:39:11.874000",
         "due_at": "2025-09-08T22:50:11.875000",
-        "assigned_to": null
+        "assigned_to": null,
+        "is_pinned": false
     },
     {
         "id": "9e81c718-0a9c-4745-8ff1-db6c92ab8efd",
@@ -138,7 +146,8 @@
         "created_at": "2025-09-08T11:40:19.532604",
         "start_at": "2025-09-08T11:40:14.933000",
         "due_at": "2025-09-09T11:40:14.936000",
-        "assigned_to": null
+        "assigned_to": null,
+        "is_pinned": false
     },
     {
         "id": "0bb142be-7354-4035-b5a2-8e22e4851ef6",
@@ -150,6 +159,7 @@
         "created_at": "2025-09-08T16:46:37.362024",
         "start_at": "2025-09-08T16:46:31.429000",
         "due_at": "2025-09-09T16:46:31.442000",
-        "assigned_to": "2152123f-93bc-4421-a983-087a2bf5e961"
+        "assigned_to": "2152123f-93bc-4421-a983-087a2bf5e961",
+        "is_pinned": false
     }
 ]

@@ -40,8 +40,11 @@ class Task:
     start_at: Optional[datetime] = None
     due_at: Optional[datetime] = field(default=None) # New field for due time
     assigned_to: Optional[str] = None # TaskList ID
+    is_pinned: bool = False
 
 @dataclass
 class TaskList:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     name: str = ""
+    category: str = 'default'
+    is_pinned: bool = False
